@@ -239,7 +239,8 @@ const SCRIPT_URL = 'YOUR_DEPLOYMENT_URL';
 - Paper size: A4
 - Margins: None
 - Scale: 100%
-![Screenshot 2025-01-20 191713](https://github.com/user-attachments/assets/64945ab8-8b1d-419e-ac69-68af1ad147e4)
+<img width="1120" alt="image" src="https://github.com/user-attachments/assets/304d1461-4bc0-420e-ae4f-f485fa00a947" />
+
 
 ## File Structure
 
