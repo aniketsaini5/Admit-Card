@@ -25,6 +25,7 @@ A web-based system for generating examination admit cards with automatic dues ve
 ### 1. Google Sheet Setup
 
 Create a Google Sheet with two sheets:
+![1738058611507](image/README/1738058611507.png)
 
 #### Sheet 1: "Student"
 
@@ -33,14 +34,159 @@ Create a Google Sheet with two sheets:
 
 #### Sheet 2: "DateSheet"
 
-| Date | Subject | Course | Shift | Time | Center |  |
-| ---- | ------- | ------ | ----- | ---- | ------ | - |
+| Date | Subject | Course | Shift | Time | Center |
+| ---- | ------- | ------ | ----- | ---- | ------ |
 
 ### 2. Google Apps Script Setup
 
 1. Open your Google Sheet
 2. Go to Extensions > Apps Script
 3. Copy the provided Apps Script code into the editor
+   ```
+   function doGet(e) {
+     const output = ContentService.createTextOutput();
+     output.setMimeType(ContentService.MimeType.JSON);
+     
+     try {
+       // Basic parameter validation
+       if (!e?.parameter?.rollno) {
+         return output.setContent(JSON.stringify({
+           error: "Please provide a valid Roll Number"
+         }));
+       }
+
+       const rollNo = e.parameter.rollno.toString();
+       const ss = SpreadsheetApp.getActiveSpreadsheet();
+       const studentSheet = ss.getSheetByName("Student");
+       const dateSheet = ss.getSheetByName("DateSheet");
+
+       if (!studentSheet || !dateSheet) {
+         return output.setContent(JSON.stringify({
+           error: "Required sheets not found"
+         }));
+       }
+
+       // Get student data first
+       const studentData = findStudent(studentSheet, rollNo);
+       if (!studentData) {
+         return output.setContent(JSON.stringify({
+           error: "Student not found. Please check the Roll Number."
+         }));
+       }
+
+       // Get exam schedule for the student's course
+       const examSchedule = findExams(dateSheet, studentData.course);
+     
+       const response = {
+         student: studentData,
+         examSchedule: examSchedule,
+         exam: {
+           center: "Campus"
+         }
+       };
+
+       return output.setContent(JSON.stringify(response));
+
+     } catch (error) {
+       Logger.log('Error in doGet: ' + error.toString());
+       return output.setContent(JSON.stringify({
+         error: "An unexpected error occurred. Please try again later."
+       }));
+     }
+   }
+
+   function findStudent(sheet, rollNo) {
+     try {
+       const data = sheet.getDataRange().getValues();
+       const headers = data[0];
+
+       // Find column indices
+       const rollNoCol = 2;  // Column C (0-based index)
+       const nameCol = 0;    // Column A
+       const courseCol = 1;  // Column B
+       const dobCol = 3;     // Column D
+       const semCol = 4;     // Column E
+       const photoCol = 5;   // Column F
+       const duesCol = 6;    // Column G
+
+       // Search for student
+       for (let i = 1; i < data.length; i++) {
+         if (data[i][rollNoCol].toString() === rollNo) {
+           return {
+             name: data[i][nameCol],
+             course: data[i][courseCol],
+             rollNo: data[i][rollNoCol].toString(),
+             dob: formatDate(data[i][dobCol]),
+             semester: data[i][semCol],
+             photo: data[i][photoCol] || null,
+             duesStatus: data[i][duesCol]
+           };
+         }
+       }
+       return null;
+
+     } catch (error) {
+       Logger.log('Error in findStudent: ' + error.toString());
+       throw error;
+     }
+   }
+
+   function findExams(sheet, course) {
+     try {
+       const data = sheet.getDataRange().getValues();
+       const exams = [];
+
+       // Skip header row
+       for (let i = 1; i < data.length; i++) {
+         if (data[i][2] === course) {  // Column C contains course
+           exams.push({
+             date: formatDate(data[i][0]),      // Column A
+             subject: data[i][1],               // Column B
+             course: data[i][2],                // Column C
+             shift: data[i][3],                 // Column D
+             time: data[i][4],                  // Column E
+             center: data[i][5] || "Campus"     // Column F
+           });
+         }
+       }
+     
+       return exams;
+
+     } catch (error) {
+       Logger.log('Error in findExams: ' + error.toString());
+       throw error;
+     }
+   }
+
+   function formatDate(date) {
+     if (!date) return null;
+     
+     try {
+       if (typeof date === 'string') {
+         const [day, month, year] = date.split('-');
+         date = new Date(year, month - 1, day);
+       }
+     
+       const formattedDate = Utilities.formatDate(date, Session.getScriptTimeZone(), "dd-MM-yyyy");
+       return formattedDate;
+     } catch (error) {
+       Logger.log('Error formatting date: ' + error.toString());
+       return date.toString();
+     }
+   }
+
+   // Test function - run this to check if everything works
+   function testScript() {
+     const testEvent = {
+       parameter: {
+         rollno: "101"  // Test with an existing roll number
+       }
+     };
+     
+     const result = doGet(testEvent);
+     Logger.log(result.getContent());
+   }
+   ```
 4. Deploy as a web app:
    - Execute as: `Me`
    - Who has access: `Anyone`
@@ -150,7 +296,7 @@ For support, please:
 - Tailwind CSS for styling
 - Your University/Institution name
 
-This README provides comprehensive documentation for setting up and using the Admit Card System. It includes all necessary information for both administrators and developers to understand and maintain the system.
+##### This README provides comprehensive documentation for setting up and using the Admit Card System. It includes all necessary information for both administrators and developers to understand and maintain the system.
 
 Make sure to customize the following sections based on your specific implementation:
 
@@ -158,7 +304,3 @@ Make sure to customize the following sections based on your specific implementat
 2. Add any specific institutional requirements
 3. Update security and support sections as needed
 4. Add your institution's specific license requirements
-
-```
-
-```
