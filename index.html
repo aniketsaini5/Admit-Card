@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>University Examination Portal</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <style>
+        /* A4 size in pixels (assuming 96 DPI) */
+        @page {
+            size: A4;
+            margin: 0;
+        }
+
+        .a4-page {
+            width: 210mm;
+            height: 297mm;
+            margin: 0 auto;
+            background: white;
+            padding: 20mm;
+            box-sizing: border-box;
+        }
+
+        @media print {
+            body {
+                margin: 0;
+                padding: 0;
+                background: white;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .a4-page {
+                margin: 0;
+                padding: 10mm;
+                box-shadow: none;
+            }
+        }
+
+        /* Rest of your existing styles */
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --secondary: #475569;
+            --danger: #dc2626;
+            --success: #16a34a;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #f8fafc;
+        }
+
+        .loading {
+            position: relative;
+        }
+
+        .loading::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            top: 50%;
+            left: 50%;
+            margin: -10px 0 0 -10px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .admit-card {
+            background: white;
+            width: 100%;
+            height: 100%;
+        }
+
+        .university-logo {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 1rem;
+        }
+
+        .student-photo {
+            width: 150px;
+            height: 180px;
+            border: 1px solid #000;
+            object-fit: cover;
+        }
+
+        .controller-sign {
+            width: 200px;
+            height: auto;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- Form Section -->
+    <div class="max-w-md mx-auto p-6">
+        <div class="bg-white rounded-lg shadow-sm p-8">
+            <div class="text-center mb-8">
+                <h1 class="text-2xl font-bold text-gray-800 mb-2">Examination Portal</h1>
+                <p class="text-gray-600">Download your admit card</p>
+            </div>
+
+            <form id="admitCardForm" class="space-y-6">
+                <div>
+                    <label for="rollno" class="block text-sm font-medium text-gray-700 mb-1">Roll Number</label>
+                    <input 
+                        type="text" 
+                        id="rollno" 
+                        class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
+                        placeholder="Enter your roll number"
+                        required
+                    >
+                </div>
+
+                <button 
+                    type="submit"
+                    class="w-full bg-primary text-white py-2 px-4 rounded-md hover:bg-primary-dark transition-colors"
+                >
+                    Download Admit Card
+                </button>
+
+                <div id="error-message" class="hidden text-danger text-sm text-center"></div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxJ09O_C0ZjOjhX9ZJg7-jhvKbbCKU7rNZj_WY_IlIlm_a5wM1760Hx62BhpC_rNg8/exec';
+        
+        const form = document.getElementById('admitCardForm');
+        const errorDiv = document.getElementById('error-message');
+        
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const rollNo = document.getElementById('rollno').value.trim();
+            const submitButton = form.querySelector('button[type="submit"]');
+            
+            if (!rollNo) {
+                showError('Please enter a roll number');
+                return;
+            }
+
+            submitButton.disabled = true;
+            submitButton.classList.add('loading');
+            submitButton.textContent = 'Fetching...';
+            hideError();
+
+            try {
+                const response = await fetch(`${SCRIPT_URL}?rollno=${rollNo}`);
+                const data = await response.json();
+
+                if (data.error) {
+                    showError(data.error);
+                    return;
+                }
+
+                generateAdmitCard(data);
+            } catch (error) {
+                showError('Failed to fetch admit card. Please try again.');
+            } finally {
+                submitButton.disabled = false;
+                submitButton.classList.remove('loading');
+                submitButton.textContent = 'Download Admit Card';
+            }
+        });
+
+        function showError(message) {
+            errorDiv.textContent = message;
+            errorDiv.classList.remove('hidden');
+        }
+
+        function hideError() {
+            errorDiv.textContent = '';
+            errorDiv.classList.add('hidden');
+        }
+
+        function formatExamSchedule(schedule) {
+            return schedule.map(exam => `
+                <tr>
+                    <td class="border px-4 py-2">${exam.date}</td>
+                    <td class="border px-4 py-2">${exam.subject}</td>
+                    <td class="border px-4 py-2">${exam.time}</td>
+                    <td class="border px-4 py-2">${exam.shift}</td>
+                </tr>
+            `).join('');
+        }
+
+        function generateAdmitCard(data) {
+
+            if (data.student.duesStatus === 'Yes') {
+        showError('Cannot generate admit card. You have pending dues.');
+        return;
+    }
+            const admitCardHTML = `
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>Examination Admit Card</title>
+                    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+                    <style>
+                        @page {
+                            size: A4;
+                            margin: 0;
+                        }
+                        .a4-page {
+                            width: 210mm;
+                            height: 297mm;
+                            margin: 0 auto;
+                            padding: 20mm;
+                            background: white;
+                        }
+                        @media print {
+                            body { margin: 0; background: white; }
+                            .no-print { display: none !important; }
+                            .a4-page { margin: 0; box-shadow: none; }
+                        }
+                        .student-photo {
+                            width: 150px;
+                            height: 180px;
+                            border: 1px solid #000;
+                            object-fit: cover;
+                        }
+                        .controller-sign {
+                            width: 200px;
+                            height: auto;
+                            margin-top: 10px;
+                        }
+                            .signature-section {
+                    display: flex;
+                    justify-content: space-between;
+                    margin-top: 4rem;
+                    padding: 0 2rem;
+                }
+                
+                .signature-box {
+                    text-align: center;
+                    width: 250px;
+                }
+                
+                .signature-line {
+                    width: 100%;
+                    border-top: 1px solid #000;
+                    margin-top: 1rem;
+                    padding-top: 0.5rem;
+                }
+
+                .controller-sign {
+                    width: 150px;
+                    height: auto;
+                    margin: 0 auto 1rem;
+                }
+
+                .student-details {
+                    display: grid;
+                    grid-template-columns: 1fr auto;
+                    gap: 2rem;
+                    align-items: start;
+                }
+
+                .details-grid {
+                    display: grid;
+                    gap: 1rem;
+                }
+
+                .detail-row {
+                    display: grid;
+                    grid-template-columns: 150px 1fr;
+                    gap: 1rem;
+                }
+                    </style>
+                </head>
+                <body class="bg-gray-100">
+                    <div class="a4-page">
+                        <div class="admit-card">
+                            <header class="text-center mb-8">
+                                <div class="university-logo mx-auto mb-4">
+                                    <img src="/university-logo.png" alt="University Logo" class="w-32 h-32 mx-auto">
+                                </div>
+                                <h1 class="text-2xl font-bold text-gray-900 mb-2">UNIVERSITY NAME</h1>
+                                <h2 class="text-xl text-gray-700">Examination Admit Card 2024</h2>
+                                <p class="text-gray-600">End Semester Examination</p>
+                            </header>
+
+                              <div class="student-details mb-8">
+                        <div class="details-grid">
+                            <div class="detail-row">
+                                <span class="font-semibold">Roll Number:</span>
+                                <span>${data.student.rollNo}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="font-semibold">Name:</span>
+                                <span>${data.student.name}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="font-semibold">Course:</span>
+                                <span>${data.student.course}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="font-semibold">Semester:</span>
+                                <span>${data.student.semester}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="font-semibold">Examination Center:</span>
+                                <span>${data.exam.center}</span>
+                            </div>
+                        </div>
+                        <div>
+                            <img src="${data.student.photo}" alt="Student Photo" class="student-photo">
+                        </div>
+                    </div>
+
+                            <div class="mb-8">
+                                <h3 class="text-lg font-medium mb-4">Examination Schedule</h3>
+                                <table class="w-full border-collapse">
+                                    <thead>
+                                        <tr class="bg-gray-50">
+                                            <th class="border px-4 py-2 text-left">Date</th>
+                                            <th class="border px-4 py-2 text-left">Subject</th>
+                                            <th class="border px-4 py-2 text-left">Time</th>
+                                            <th class="border px-4 py-2 text-left">Shift</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${formatExamSchedule(data.examSchedule)}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="signature-section">
+                        <div class="signature-box">
+                            <div style="height: 60px;"></div> <!-- Space for student signature -->
+                            <div class="signature-line">
+                                Student's Signature
+                            </div>
+                        </div>
+                        <div class="signature-box">
+                            <img src="s-e.png" alt="Controller's Signature" class="controller-sign">
+                            <div class="signature-line">
+                                Controller of Examinations
+                            </div>
+                        </div>
+                    </div>
+                            <div class="bg-gray-50 p-4 rounded">
+                                <h3 class="font-medium mb-2">Important Instructions:</h3>
+                                <ul class="list-disc pl-5 space-y-1 text-sm">
+                                    <li>Bring this admit card to every examination</li>
+                                    <li>Arrive 30 minutes before examination start time</li>
+                                    <li>Mobile phones and electronic devices are prohibited</li>
+                                    <li>Follow all examination hall guidelines</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="fixed bottom-4 right-4 no-print">
+                        <button 
+                            onclick="window.print()" 
+                            class="bg-blue-600 text-white px-6 py-2 rounded-lg shadow hover:bg-blue-700 transition-colors"
+                        >
+                            Print Admit Card
+                        </button>
+                    </div>
+                </body>
+                </html>
+            `;
+
+            const newWindow = window.open('', '_blank');
+            newWindow.document.write(admitCardHTML);
+            newWindow.document.close();
+        }
+    </script>
+</body>
+</html>
